@@ -1,0 +1,8 @@
+sympy>=1.13
+mlx-lm>=0.20        # Apple Silicon only; the training/inference backend
+pyyaml>=6.0
+matplotlib>=3.8
+pytest>=8.0
+# Stage 4 API baselines (uncomment when you wire them):
+# openai>=1.40
+# google-generativeai>=0.8

@@ -1,0 +1,12 @@
+# Evaluation (Stage 4). Same scaffold + decoding for EVERY model (apples-to-apples).
+splits: [test_id, test_ood]
+decoding:
+  temperature: 0.0      # headline number is deterministic
+  max_tokens: 512
+seeds: [0, 1, 2]        # extra sampled runs for variance
+models:
+  - {name: base,        backend: mlx,    path: mlx-community/Qwen2.5-3B-Instruct-4bit}
+  - {name: base_fewshot,backend: mlx,    path: mlx-community/Qwen2.5-3B-Instruct-4bit, fewshot: 4}
+  - {name: finetuned,   backend: mlx,    path: ./adapters/qwen3b-r16}
+  - {name: gpt-4o,      backend: openai, model: gpt-4o}
+  - {name: gemini,      backend: gemini, model: gemini-1.5-pro}

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lc-calculus-llm"
+version = "0.1.0"
+description = "QLoRA fine-tuning + rigorous eval on Leaving Cert Higher Level calculus"
+requires-python = ">=3.10"
+dependencies = ["sympy>=1.13", "pyyaml>=6.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

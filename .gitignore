@@ -1,0 +1,15 @@
+# data is REGENERABLE from generate.py + seed — never commit it
+data/*
+!data/.gitkeep
+# trained weights are large + regenerable — use a Release or git-lfs if you must share
+adapters/*
+!adapters/.gitkeep
+# keep results (they ARE the evidence) but ignore scratch
+results/runs/*/raw_cache/
+__pycache__/
+*.pyc
+.venv/
+.env
+.ipynb_checkpoints/
+*.egg-info/
+.pytest_cache/

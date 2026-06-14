@@ -1,0 +1,7 @@
+# Dataset generation (Stage 1). Reproducible from seed alone.
+n: 3000
+seed: 0
+ood: 300
+out: ./data
+# difficulty mix is currently uniform over {easy,medium,hard} in generate.py;
+# after the headroom test, reweight here if accuracy is out of the 30-65% band.

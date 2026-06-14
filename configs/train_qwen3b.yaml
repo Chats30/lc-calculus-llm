@@ -1,0 +1,14 @@
+# QLoRA fine-tuning (Stage 3) — MLX. Mirror these into the mlx_lm.lora invocation.
+base_model: mlx-community/Qwen2.5-3B-Instruct-4bit   # 4-bit => QLoRA
+fine_tune_type: lora
+num_layers: 16
+lora:
+  rank: 16
+  alpha: 32          # mlx 'scale' ~ alpha; tune together with rank
+  dropout: 0.05
+batch_size: 2
+grad_accumulation_steps: 8   # effective batch 16
+iters: 600
+learning_rate: 1.0e-4
+seed: 0
+adapter_path: ./adapters/qwen3b-r16
