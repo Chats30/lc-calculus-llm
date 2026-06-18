@@ -246,7 +246,7 @@ def build_item(rng, kind, tier, idx):
 # Dataset generation with dedup + splits
 # ----------------------------------------------------------------------------------
 
-TRAIN_TIERS = ["easy", "medium", "hard"]
+TRAIN_TIERS = ["medium", "hard", "hard"]
 
 def generate(n, seed):
     rng = random.Random(seed)
