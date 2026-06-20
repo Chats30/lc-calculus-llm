@@ -32,6 +32,7 @@ import sympy as sp
 x = sp.Symbol("x")
 
 from lc_calc.grader import grade  # single source of truth
+from lc_calc.prompts import build_messages
 
 # ----------------------------------------------------------------------------------
 # Pretty-printing helpers (LC-style problem text)
@@ -179,27 +180,52 @@ def make_int(rng, tier):
 # ----------------------------------------------------------------------------------
 
 def diff_solution(f, gold):
-    return (
-        f"We differentiate f(x) = {expr_to_text(f)} with respect to x, "
-        f"applying the standard rules (power/product/quotient/chain as needed). "
-        f"This gives f'(x) = {expr_to_text(sp.simplify(gold))}."
-    )
+    d = sp.simplify(sp.diff(f, x))
+    L = [f"We differentiate f(x) = {expr_to_text(f)} with respect to x."]
+    is_quot = f.is_Mul and any(a.is_Pow and a.exp.is_number and a.exp < 0 for a in f.args)
+    if f.is_Add:
+        L.append("It is a sum, so differentiate term by term using the power rule d/dx[a*x^n] = n*a*x^(n-1):")
+        for t in f.args:
+            L.append(f"  d/dx[{expr_to_text(t)}] = {expr_to_text(sp.diff(t, x))}")
+        L.append(f"Adding the terms gives f'(x) = {expr_to_text(d)}.")
+    elif is_quot:
+        num, den = sp.fraction(sp.together(f))
+        up, vp = sp.diff(num, x), sp.diff(den, x)
+        L.append("It is a quotient u/v, so use the quotient rule f' = (u'*v - u*v')/v^2:")
+        L.append(f"  u = {expr_to_text(num)}, v = {expr_to_text(den)}, u' = {expr_to_text(up)}, v' = {expr_to_text(vp)}")
+        L.append(f"  f'(x) = ({expr_to_text(up)}*({expr_to_text(den)}) - ({expr_to_text(num)})*{expr_to_text(vp)}) / ({expr_to_text(den)})^2 = {expr_to_text(d)}.")
+    elif f.is_Mul:
+        c, rest = f.as_coeff_Mul()
+        fac = list(sp.Mul.make_args(rest))
+        u = c * fac[0]; v = sp.Mul(*fac[1:]) if len(fac) > 1 else sp.Integer(1)
+        up, vp = sp.diff(u, x), sp.diff(v, x)
+        L.append("It is a product u*v, so use the product rule f' = u'*v + u*v':")
+        L.append(f"  u = {expr_to_text(u)}, v = {expr_to_text(v)}, u' = {expr_to_text(up)}, v' = {expr_to_text(vp)}")
+        L.append(f"  f'(x) = {expr_to_text(up)}*({expr_to_text(v)}) + ({expr_to_text(u)})*{expr_to_text(vp)} = {expr_to_text(d)}.")
+    elif f.is_Pow:
+        g, n = f.base, f.exp
+        gp = sp.diff(g, x)
+        L.append("It is a power g(x)^n, so use the chain rule f' = n*g(x)^(n-1)*g'(x):")
+        L.append(f"  g = {expr_to_text(g)}, n = {expr_to_text(n)}, g'(x) = {expr_to_text(gp)}")
+        L.append(f"  f'(x) = {expr_to_text(n)}*({expr_to_text(g)})^{expr_to_text(n-1)}*({expr_to_text(gp)}) = {expr_to_text(d)}.")
+    elif f.func in (sp.sin, sp.cos, sp.exp, sp.log, sp.tan):
+        g = f.args[0]; gp = sp.diff(g, x)
+        nm = {sp.sin: "sin", sp.cos: "cos", sp.exp: "exp", sp.log: "ln", sp.tan: "tan"}[f.func]
+        L.append(f"It is a composition {nm}(g(x)); use the chain rule with g = {expr_to_text(g)}, g'(x) = {expr_to_text(gp)}:")
+        L.append(f"  f'(x) = {expr_to_text(d)}.")
+    else:
+        L.append(f"  f'(x) = {expr_to_text(d)}.")
+    return "\n".join(L)
+
 
 def int_solution(f, F, subtype):
-    technique = {
-        "int_poly": "integrating term by term using the power rule",
-        "int_trig": "reversing the derivative of sine/cosine",
-        "int_exp": "reversing the derivative of the exponential",
-        "int_substitution": "a linear/substitution recognition",
-        "int_byparts": "integration by parts",
-        "int_byparts_quad": "integration by parts (applied repeatedly)",
-        "int_product_trig_exp": "integration by parts (cyclic)",
-    }.get(subtype, "standard techniques")
-    return (
-        f"We integrate f(x) = {expr_to_text(f)} using {technique}. "
-        f"The antiderivative is F(x) = {expr_to_text(sp.simplify(F))} + C, "
-        f"which can be checked since F'(x) = f(x)."
-    )
+    terms = list(f.args) if f.is_Add else [f]
+    L = [f"We integrate f(x) = {expr_to_text(f)} by reversing differentiation term by term."]
+    for t in terms:
+        anti = sp.simplify(sp.integrate(t, x))
+        L.append(f"  integral of {expr_to_text(t)} dx = {expr_to_text(anti)}")
+    L.append(f"Combining and adding the constant: F(x) = {expr_to_text(sp.simplify(F))} + C.")
+    return "\n".join(L)
 
 
 # ----------------------------------------------------------------------------------
@@ -239,6 +265,7 @@ def build_item(rng, kind, tier, idx):
         "gold_srepr": gold_srepr,     # machine-checkable ground truth
         "solution_steps": steps,
         "text": f"{prompt}\n\n{steps}\nAnswer: {expr_to_text(gold)}",  # SFT target
+        "messages": build_messages(prompt, f"{steps}\nAnswer: {expr_to_text(gold)}"),
     }
 
 
@@ -280,6 +307,13 @@ def generate_ood(n, rng, seen):
         seen.add(key)
         items.append(it)
     return items
+
+
+def write_chat(path, rows):
+    """Chat-format for mlx_lm.lora: one {"messages": [...]} per line."""
+    with open(path, "w") as fh:
+        for r in rows:
+            fh.write(json.dumps({"messages": r["messages"]}) + "\n")
 
 
 def write_jsonl(path, rows):
@@ -332,8 +366,8 @@ def main():
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    write_jsonl(out / "train.jsonl", train)
-    write_jsonl(out / "valid.jsonl", valid)
+    write_chat(out / "train.jsonl", train)
+    write_chat(out / "valid.jsonl", valid)
     write_jsonl(out / "test_id.jsonl", test_id)
     write_jsonl(out / "test_ood.jsonl", ood)
     print(f"train={len(train)}  valid={len(valid)}  test_id={len(test_id)}  test_ood={len(ood)}")

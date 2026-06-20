@@ -11,6 +11,7 @@ def main():
     ap.add_argument("--data", default="./data/test_id.jsonl")
     ap.add_argument("--max-tokens", type=int, default=1024)
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--adapter-path", default=None)
     ap.add_argument("--out", default="./results/runs/headroom.jsonl")
     args = ap.parse_args()
     from mlx_lm import load, generate as mlx_generate
@@ -19,7 +20,7 @@ def main():
         _sampler = make_sampler(temp=0.0); _logits = make_logits_processors(repetition_penalty=1.15)
     except Exception:
         _sampler = _logits = None
-    model, tok = load(args.model)
+    model, tok = load(args.model, adapter_path=args.adapter_path)
     def gen(prompt):
         kw = dict(max_tokens=args.max_tokens, verbose=False)
         if _sampler is not None:
