@@ -27,6 +27,7 @@ def _extract_boxed(text):
 
 
 def _clean(s):
+    s = s.replace("**", " ")
     s = s.replace("$"," ").replace("\\(", " ").replace("\\)"," ").replace("\\[", " ").replace("\\]"," ")
     s = s.replace("\\left","").replace("\\right","")
     for _ in range(4):
@@ -46,11 +47,17 @@ def _clean(s):
 
 def parse_answer(text):
     """Return (sympy_expr_or_None, parse_ok: bool)."""
-    boxed = _extract_boxed(text)
-    region = boxed if boxed is not None else (
-        text.split("Answer:")[-1] if "Answer:" in text else
-        (([l for l in text.strip().splitlines() if l.strip()] or [""])[-1]))
-    line = next((l for l in region.strip().splitlines() if l.strip()), "")
+    # Strip LaTeX \\text{...} wrappers so "\\text{Answer: }" becomes "Answer: "
+    text = re.sub(r"\\text\s*\{([^{}]*)\}", r"\1", text)
+    if "Answer:" in text:
+        region = text.split("Answer:")[-1]
+    else:
+        boxed = _extract_boxed(text)
+        region = boxed if boxed is not None else (
+            ([l for l in text.strip().splitlines() if l.strip()] or [""])[-1])
+    # take everything up to the LaTeX display close, joining wrapped lines
+    region = region.split("\\]")[0].split("$$")[0]
+    line = " ".join(l.strip() for l in region.strip().splitlines() if l.strip())
     line = line.split("Answer:")[-1]
     line = _clean(line)
     if "=" in line: line = line.split("=")[-1]
