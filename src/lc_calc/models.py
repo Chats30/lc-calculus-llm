@@ -17,6 +17,7 @@ class GitHubModelsBackend:
                  endpoint="https://models.github.ai/inference",
                  token_env="OPENAI_API_KEY", max_tokens=4096):
         from openai import OpenAI
+        from openai import RateLimitError, APITimeoutError, APIConnectionError, InternalServerError
         token = os.environ.get(token_env)
         if not token:
             raise RuntimeError(
@@ -24,6 +25,7 @@ class GitHubModelsBackend:
         self.client = OpenAI(base_url=endpoint, api_key=token)
         self.model = model
         self.max_tokens = max_tokens
+        self._retriable = (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError)
 
     def _create(self, messages):
         try:
@@ -36,7 +38,7 @@ class GitHubModelsBackend:
                     max_completion_tokens=self.max_tokens)
             raise
 
-    def generate(self, messages, max_retries=6):
+    def generate(self, messages, max_retries=12):
         """Return (text, usage_dict, latency_s). Backs off on rate limits / transient errors."""
         delay = 4.0
         last_err = None
@@ -56,9 +58,11 @@ class GitHubModelsBackend:
             except Exception as e:
                 last_err = e
                 m = str(e).lower()
-                if any(s in m for s in ("429", "rate", "limit", "timeout", "503", "502", "overload")):
+                retriable = isinstance(e, self._retriable) or any(
+                    s in m for s in ("429", "rate", "limit", "too many", "timeout", "503", "502", "overload"))
+                if retriable:
                     time.sleep(delay)
-                    delay = min(delay * 2, 60)
+                    delay = min(delay * 2, 300)
                     continue
                 raise
         raise RuntimeError(f"Giving up after {max_retries} retries: {last_err}")

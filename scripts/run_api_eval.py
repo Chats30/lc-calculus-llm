@@ -5,7 +5,7 @@ test_id set, through the SAME parse+grade path as the local models.
   python scripts/run_api_eval.py --limit 5     # smoke test
   python scripts/run_api_eval.py               # full run (resumable)
 """
-import argparse, json, os
+import argparse, json, os, time
 from tqdm import tqdm
 from lc_calc.prompts import user_content
 from lc_calc.parsing import parse_answer
@@ -33,6 +33,7 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--max-tokens", type=int, default=4096)
     ap.add_argument("--token-env", default="OPENAI_API_KEY")
+    ap.add_argument("--sleep", type=float, default=1.0, help="seconds between calls")
     args = ap.parse_args()
 
     rows = [json.loads(l) for l in open(args.data)]
@@ -57,6 +58,7 @@ def main():
                "raw": text, "parsed": str(cand), "parse_ok": parsed, "correct": ok,
                "latency_s": round(dt, 2), "usage": usage}
         fh.write(json.dumps(rec) + "\n"); fh.flush()
+        time.sleep(args.sleep)
     fh.close()
 
     allrec = load_done(args.out)
